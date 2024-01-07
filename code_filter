@@ -1,0 +1,71 @@
+import cv2
+import numpy as np
+
+def tilt_shift_on_faces(image, face_cascade):
+    rows, cols, _ = image.shape
+
+    # Konversi gambar ke skala abu-abu untuk deteksi wajah
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Deteksi wajah menggunakan klasifikasi wajah Haarcascade
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.3, minNeighbors=5)
+
+    # Buat mask untuk efek tilt-shift
+    mask = np.zeros((rows, cols), dtype=np.uint8)
+
+    # Loop melalui setiap wajah yang terdeteksi
+    for (x, y, w, h) in faces:
+        # Tentukan area wajah pada gambar
+        face_roi = image[y:y+h, x:x+w]
+
+        # Terapkan efek tilt-shift pada area sekitar wajah
+        face_mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.circle(face_mask, (w//2, h//2), h//2, 255, thickness=-1)  # Mengubah nilai dari h//4 menjadi h//3
+        blurred_face = cv2.GaussianBlur(face_roi, (15, 15), 0)
+        face_roi = cv2.bitwise_and(blurred_face, face_roi, mask=face_mask)
+
+        # Tempatkan wajah yang telah dimodifikasi kembali pada gambar asli
+        image[y:y+h, x:x+w] = face_roi
+
+        # Update mask untuk efek tilt-shift
+        cv2.circle(mask, (x + w//2, y + h//2), h//2, 255, thickness=-1)  # Mengubah nilai dari h//4 menjadi h//3
+
+    # Terapkan efek tilt-shift pada seluruh gambar menggunakan mask
+    blurred = cv2.GaussianBlur(image, (15, 15), 0)
+    result = cv2.bitwise_and(blurred, image, mask=mask)
+
+    return result
+
+# Inisialisasi objek kamera
+cap = cv2.VideoCapture(0)
+
+# Periksa apakah kamera terbuka dengan benar
+if not cap.isOpened():
+    print("Error: Gagal membuka kamera.")
+    exit()
+
+# Menggunakan klasifikasi wajah Haarcascade
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+while True:
+    # Baca frame dari kamera
+    ret, frame = cap.read()
+
+    # Periksa apakah berhasil membaca frame
+    if not ret:
+        print("Error: Gagal membaca frame.")
+        break
+
+    # Terapkan efek tilt-shift pada wajah setelah membaca frame
+    frame = tilt_shift_on_faces(frame, face_cascade)
+
+    # Tampilkan frame dengan efek di jendela
+    cv2.imshow('Tilt-Shift on Faces Effect', frame)
+
+    # Hentikan program jika pengguna menekan tombol 'q'
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Tutup kamera dan jendela OpenCV
+cap.release()
+cv2.destroyAllWindows()
